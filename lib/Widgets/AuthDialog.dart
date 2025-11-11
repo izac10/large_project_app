@@ -51,10 +51,33 @@ class _AuthDialogState extends State<AuthDialog>
         email: _loginEmail.text.trim(),
         password: _loginPass.text,
       );
-      Session.currentUser = AppUser.fromJson(json['user']);
+
+      // Debug: Print what we received
+      print('🔍 Login response: $json');
+      print('🔍 User data: ${json['user']}');
+
+      final user = AppUser.fromJson(json['user']);
+      Session.currentUser = user;
+
+      // Debug: Print parsed user
+      print('✅ Parsed user: ${user.toJson()}');
+      print('✅ User role: ${user.role}');
+      print('✅ User isAdmin: ${user.isAdmin}');
+      print('✅ Session.isAdmin: ${Session.isAdmin}');
+
       if (!mounted) return;
       Navigator.pop(context, true);
+
+      // Show success message with role info
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Logged in as ${user.role} (Admin: ${user.isAdmin})',
+          ),
+        ),
+      );
     } catch (e) {
+      print('❌ Login error: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Login failed: $e')));
@@ -67,16 +90,42 @@ class _AuthDialogState extends State<AuthDialog>
     setState(() => _busy = true);
     try {
       final name = '${_first.text.trim()} ${_last.text.trim()}'.trim();
+
+      print('🔍 Registering with role: $_role');
+
       final json = await ApiService.register(
         name: name,
         email: _email.text.trim(),
         password: _pass.text,
         role: _role,
       );
-      Session.currentUser = AppUser.fromJson(json['user']);
+
+      // Debug: Print what we received
+      print('🔍 Register response: $json');
+      print('🔍 User data: ${json['user']}');
+
+      final user = AppUser.fromJson(json['user']);
+      Session.currentUser = user;
+
+      // Debug: Print parsed user
+      print('✅ Parsed user: ${user.toJson()}');
+      print('✅ User role: ${user.role}');
+      print('✅ User isAdmin: ${user.isAdmin}');
+      print('✅ Session.isAdmin: ${Session.isAdmin}');
+
       if (!mounted) return;
       Navigator.pop(context, true);
+
+      // Show success message with role info
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Registered as ${user.role} (Admin: ${user.isAdmin})',
+          ),
+        ),
+      );
     } catch (e) {
+      print('❌ Register error: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Registration failed: $e')));
@@ -111,72 +160,63 @@ class _AuthDialogState extends State<AuthDialog>
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       backgroundColor: Colors.transparent,
       child: GestureDetector(
-        // Dismiss keyboard if user taps outside fields
         onTap: () => FocusScope.of(context).unfocus(),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: BoxConstraints(
+              maxWidth: 420,
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
             child: Container(
               decoration: BoxDecoration(
                 color: _cardColor,
                 borderRadius: BorderRadius.circular(24),
               ),
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-              // This is key: use scrollable content but fixed container height
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedBuilder(
-                    animation: _tab,
-                    builder: (context, _) {
-                      final isLogin = _tab.index == 0;
-                      return Column(
-                        children: [
-                          Text(
-                            isLogin ? 'Login' : 'Create Account',
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _tab,
+                      builder: (context, _) {
+                        final isLogin = _tab.index == 0;
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              isLogin ? 'Login' : 'Create Account',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.black,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // The scrollable area — fixed container height
-                          SizedBox(
-                            height: isLogin ? 320 : 480,
-                            child: TabBarView(
-                              controller: _tab,
-                              physics: const NeverScrollableScrollPhysics(),
+                            const SizedBox(height: 16),
+                            isLogin ? _buildLoginForm() : _buildRegisterForm(),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                _buildLoginForm(),
-                                _buildRegisterForm(),
+                                Text(
+                                  isLogin
+                                      ? "Don't have an account? "
+                                      : "Already have an account? ",
+                                  style: const TextStyle(color: Colors.black87),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      _tab.animateTo(isLogin ? 1 : 0),
+                                  child: Text(isLogin ? 'Sign Up' : 'Log In'),
+                                ),
                               ],
                             ),
-                          ),
-
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                isLogin
-                                    ? "Don’t have an account? "
-                                    : "Already have an account? ",
-                                style: const TextStyle(color: Colors.black87),
-                              ),
-                              TextButton(
-                                onPressed: () =>
-                                    _tab.animateTo(isLogin ? 1 : 0),
-                                child: Text(isLogin ? 'Sign Up' : 'Log In'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -185,121 +225,115 @@ class _AuthDialogState extends State<AuthDialog>
     );
   }
 
-  // LOGIN form
   Widget _buildLoginForm() {
-    return SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _loginEmail,
-            keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(fontSize: 18),
-            decoration: _decor('username'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _loginPass,
-            obscureText: true,
-            style: const TextStyle(fontSize: 18),
-            decoration: _decor('password'),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton.icon(
-              onPressed: _busy ? null : _login,
-              label: const Text(
-                'Sign in',
-                style: TextStyle(fontSize: 20, color: Colors.black),
-              ),
-              icon: const Icon(Icons.lock, color: Colors.black),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _loginEmail,
+          keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(fontSize: 18),
+          decoration: _decor('username'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _loginPass,
+          obscureText: true,
+          style: const TextStyle(fontSize: 18),
+          decoration: _decor('password'),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton.icon(
+            onPressed: _busy ? null : _login,
+            label: const Text(
+              'Sign in',
+              style: TextStyle(fontSize: 20, color: Colors.black),
+            ),
+            icon: const Icon(Icons.lock, color: Colors.black),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  // REGISTER form
   Widget _buildRegisterForm() {
-    return SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _first,
-            style: const TextStyle(fontSize: 18),
-            decoration: _decor('First Name'),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextField(
+          controller: _first,
+          style: const TextStyle(fontSize: 18),
+          decoration: _decor('First Name'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _last,
+          style: const TextStyle(fontSize: 18),
+          decoration: _decor('Last Name'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _email,
+          keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(fontSize: 18),
+          decoration: _decor('UCF Email'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _pass,
+          obscureText: true,
+          style: const TextStyle(fontSize: 18),
+          decoration: _decor('Password'),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _role,
+          isExpanded: true,
+          isDense: true,
+          decoration: _decor('Role').copyWith(
+            contentPadding:
+            const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _last,
-            style: const TextStyle(fontSize: 18),
-            decoration: _decor('Last Name'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _email,
-            keyboardType: TextInputType.emailAddress,
-            style: const TextStyle(fontSize: 18),
-            decoration: _decor('UCF Email'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _pass,
-            obscureText: true,
-            style: const TextStyle(fontSize: 18),
-            decoration: _decor('Password'),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: _role,
-            isExpanded: true,
-            isDense: true,
-            decoration: _decor('Role').copyWith(
-              contentPadding:
-              const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          style: const TextStyle(fontSize: 16, color: Colors.black),
+          items: const [
+            DropdownMenuItem(
+              value: 'member',
+              child: Text('Member (Student)'),
             ),
-            style: const TextStyle(fontSize: 16, color: Colors.black),
-            items: const [
-              DropdownMenuItem(
-                value: 'member',
-                child: Text('Member (Student)'),
-              ),
-              DropdownMenuItem(
-                value: 'officer',
-                child: Text('Officer (Administrator)'),
-              ),
-            ],
-            onChanged: (v) => setState(() => _role = v ?? 'member'),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed: _busy ? null : _register,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Sign Up',
-                style: TextStyle(fontSize: 20, color: Colors.black),
+            DropdownMenuItem(
+              value: 'officer',
+              child: Text('Officer (Administrator)'),
+            ),
+          ],
+          onChanged: (v) => setState(() => _role = v ?? 'member'),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: _busy ? null : _register,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
+            child: const Text(
+              'Sign Up',
+              style: TextStyle(fontSize: 20, color: Colors.black),
+            ),
           ),
-          const SizedBox(height: 20),
-        ],
-      ),
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 }

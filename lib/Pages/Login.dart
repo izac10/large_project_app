@@ -10,6 +10,7 @@ class LoginPage extends StatefulWidget {
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
+
 class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   late final TabController _tab;
 
@@ -21,7 +22,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final _regName = TextEditingController();
   final _regEmail = TextEditingController();
   final _regPassword = TextEditingController();
-  bool _regIsAdmin = false;
+  String _regRole = 'member'; // Changed from bool to String
 
   bool _busy = false;
 
@@ -72,7 +73,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         name: _regName.text.trim(),
         email: _regEmail.text.trim(),
         password: _regPassword.text,
-        isAdmin: _regIsAdmin,
+        role: _regRole, // Changed from isAdmin to role
       );
       Session.currentUser = AppUser.fromJson(json['user']);
       if (!mounted) return;
@@ -117,8 +118,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   name: _regName,
                   email: _regEmail,
                   password: _regPassword,
-                  isAdmin: _regIsAdmin,
-                  onToggleAdmin: (v) => setState(() => _regIsAdmin = v),
+                  role: _regRole,
+                  onRoleChanged: (v) => setState(() => _regRole = v),
                   busy: _busy,
                   onSubmit: _doRegister,
                 ),
@@ -185,8 +186,8 @@ class _RegisterTab extends StatelessWidget {
   final TextEditingController name;
   final TextEditingController email;
   final TextEditingController password;
-  final bool isAdmin;
-  final ValueChanged<bool> onToggleAdmin;
+  final String role;
+  final ValueChanged<String> onRoleChanged;
   final bool busy;
   final VoidCallback onSubmit;
 
@@ -194,8 +195,8 @@ class _RegisterTab extends StatelessWidget {
     required this.name,
     required this.email,
     required this.password,
-    required this.isAdmin,
-    required this.onToggleAdmin,
+    required this.role,
+    required this.onRoleChanged,
     required this.busy,
     required this.onSubmit,
   });
@@ -232,12 +233,23 @@ class _RegisterTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          CheckboxListTile(
-            value: isAdmin,
-            onChanged: (v) => onToggleAdmin(v ?? false),
-            title: const Text('I want to be an administrator'),
-            subtitle: const Text('This lets you add or edit your club'),
-            controlAffinity: ListTileControlAffinity.leading,
+          DropdownButtonFormField<String>(
+            value: role,
+            decoration: const InputDecoration(
+              labelText: 'Account Type',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'member',
+                child: Text('Member (Student)'),
+              ),
+              DropdownMenuItem(
+                value: 'officer',
+                child: Text('Officer (Administrator)'),
+              ),
+            ],
+            onChanged: (v) => onRoleChanged(v ?? 'member'),
           ),
           const SizedBox(height: 8),
           SizedBox(
