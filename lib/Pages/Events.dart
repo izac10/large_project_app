@@ -38,13 +38,31 @@ class _EventsPageState extends State<EventsPage> {
 
     try {
       final List<Map<String, dynamic>> eventsJson = await ApiService.fetchAllEvents();
+      final events = eventsJson.map((json) => Event.fromJson(json)).toList();
+
+      // ✨ NEW: Sort by date/createdAt (newest first)
+      events.sort((a, b) {
+        // First try to sort by event date
+        if (a.dateTime != null && b.dateTime != null) {
+          return b.dateTime!.compareTo(a.dateTime!); // Newest events first
+        }
+        // Fallback to createdAt if available
+        if (a.createdAt != null && b.createdAt != null) {
+          return b.createdAt!.compareTo(a.createdAt!);
+        }
+        // If one has date and other doesn't, prioritize the one with date
+        if (a.dateTime != null) return -1;
+        if (b.dateTime != null) return 1;
+        return 0;
+      });
+
       setState(() {
-        _events = eventsJson.map((json) => Event.fromJson(json)).toList();
+        _events = events;
         _loading = false;
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load events. Please ensure backend is running.';
+        _error = 'Failed to load events: $e';
         _loading = false;
         _events = [];
       });
@@ -305,7 +323,7 @@ class _EventsPageState extends State<EventsPage> {
                       crossAxisCount: 2,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
-                      childAspectRatio: 0.85,
+                      childAspectRatio: 0.75, // Reduced from 0.85 to give more height
                     ),
                     itemCount: filteredEvents.length,
                     itemBuilder: (context, i) => _eventCard(filteredEvents[i]),
@@ -408,22 +426,25 @@ class _EventsPageState extends State<EventsPage> {
             Expanded(
               flex: 2,
               child: Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Organization name (if available)
-                    if (event.organizationName != null && event.organizationName!.isNotEmpty)
+                    if (event.organizationName != null && event.organizationName!.isNotEmpty) ...[
                       Text(
                         event.organizationName!,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           color: Colors.grey[600],
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 2),
+                    ],
 
                     // Title
                     Text(
@@ -435,9 +456,9 @@ class _EventsPageState extends State<EventsPage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 6),
 
-                    // Date
+                    // Date and Attendee count on same row
                     Row(
                       children: [
                         Icon(Icons.calendar_today, size: 12, color: Colors.grey[600]),
@@ -451,6 +472,17 @@ class _EventsPageState extends State<EventsPage> {
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.people, size: 12, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${event.attendeeCount}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -716,6 +748,22 @@ class _EventDetailPageState extends State<EventDetailPage> {
                   ),
                 ],
               ),
+            const SizedBox(height: 12),
+
+            // Attendee count
+            Row(
+              children: [
+                Icon(Icons.people, color: Colors.grey[700]),
+                const SizedBox(width: 8),
+                Text(
+                  '${widget.event.attendeeCount} attendee${widget.event.attendeeCount != 1 ? 's' : ''} registered',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
 
             // Description

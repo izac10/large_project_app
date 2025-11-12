@@ -33,6 +33,16 @@ class _CalendarPageState extends State<CalendarPage> {
     _loadEvents();
   }
 
+  // ✨ ADD THIS: Reload events when page becomes visible
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload events when returning to this page
+    if (!_loading && mounted) {
+      _loadEvents();
+    }
+  }
+
   Future<void> _loadEvents() async {
     setState(() => _loading = true);
 
@@ -128,155 +138,168 @@ class _CalendarPageState extends State<CalendarPage> {
         foregroundColor: Colors.black,
         elevation: 0,
         toolbarHeight: 80,
+        // ✨ ADD REFRESH BUTTON
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadEvents,
+            tooltip: 'Refresh events',
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          // Calendar widget
-          Card(
-            margin: const EdgeInsets.all(16),
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: TableCalendar(
-                firstDay: DateTime.utc(2020, 1, 1),
-                lastDay: DateTime.utc(2030, 12, 31),
-                focusedDay: _focusedDay,
-                calendarFormat: _calendarFormat,
-                selectedDayPredicate: (day) {
-                  return isSameDay(_selectedDay, day);
-                },
-                eventLoader: _getEventsForDay,
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay = focusedDay;
-                  });
-                },
-                onFormatChanged: (format) {
-                  if (_calendarFormat != format) {
-                    setState(() {
-                      _calendarFormat = format;
-                    });
-                  }
-                },
-                onPageChanged: (focusedDay) {
-                  _focusedDay = focusedDay;
-                },
-                // Styling
-                calendarStyle: CalendarStyle(
-                  todayDecoration: BoxDecoration(
-                    color: const Color(0xFFF3C84C),
-                    shape: BoxShape.circle,
-                  ),
-                  selectedDecoration: BoxDecoration(
-                    color: const Color(0xFFF3C84C).withOpacity(0.8),
-                    shape: BoxShape.circle,
-                  ),
-                  markerDecoration: BoxDecoration(
-                    color: Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                  markersMaxCount: 3,
-                  markerSize: 6,
+          : RefreshIndicator(
+        // ✨ ADD PULL-TO-REFRESH
+        onRefresh: _loadEvents,
+        child: CustomScrollView(
+          slivers: [
+            // Calendar Card
+            SliverToBoxAdapter(
+              child: Card(
+                margin: const EdgeInsets.all(16),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                headerStyle: HeaderStyle(
-                  titleTextStyle: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                  leftChevronIcon: const Icon(
-                    Icons.chevron_left,
-                    color: Colors.black,
-                  ),
-                  rightChevronIcon: const Icon(
-                    Icons.chevron_right,
-                    color: Colors.black,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: TableCalendar(
+                    firstDay: DateTime.utc(2020, 1, 1),
+                    lastDay: DateTime.utc(2030, 12, 31),
+                    focusedDay: _focusedDay,
+                    calendarFormat: _calendarFormat,
+                    selectedDayPredicate: (day) {
+                      return isSameDay(_selectedDay, day);
+                    },
+                    eventLoader: _getEventsForDay,
+                    onDaySelected: (selectedDay, focusedDay) {
+                      setState(() {
+                        _selectedDay = selectedDay;
+                        _focusedDay = focusedDay;
+                      });
+                    },
+                    onFormatChanged: (format) {
+                      if (_calendarFormat != format) {
+                        setState(() {
+                          _calendarFormat = format;
+                        });
+                      }
+                    },
+                    onPageChanged: (focusedDay) {
+                      _focusedDay = focusedDay;
+                    },
+                    // Styling
+                    calendarStyle: CalendarStyle(
+                      todayDecoration: BoxDecoration(
+                        color: const Color(0xFFF3C84C),
+                        shape: BoxShape.circle,
+                      ),
+                      selectedDecoration: BoxDecoration(
+                        color: const Color(0xFFF3C84C).withOpacity(0.8),
+                        shape: BoxShape.circle,
+                      ),
+                      markerDecoration: BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                      markersMaxCount: 3,
+                      markerSize: 6,
+                    ),
+                    headerStyle: HeaderStyle(
+                      titleTextStyle: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                      leftChevronIcon: const Icon(
+                        Icons.chevron_left,
+                        color: Colors.black,
+                      ),
+                      rightChevronIcon: const Icon(
+                        Icons.chevron_right,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          // Category filter button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _selectedDay != null
-                      ? 'Events on ${_selectedDay!.month}/${_selectedDay!.day}'
-                      : 'Events',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _showCategoryFilter,
-                  icon: const Icon(Icons.filter_list, size: 18),
-                  label: Text(_selectedCategory ?? 'All'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[300],
-                    foregroundColor: Colors.black,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+            // Filter and Header
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _selectedDay != null
+                          ? 'Events on ${_selectedDay!.month}/${_selectedDay!.day}'
+                          : 'Events',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                    ElevatedButton.icon(
+                      onPressed: _showCategoryFilter,
+                      icon: const Icon(Icons.filter_list, size: 18),
+                      label: Text(_selectedCategory ?? 'All'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[300],
+                        foregroundColor: Colors.black,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
 
-          // Events list for selected day
-          Expanded(
-            child: _buildEventsList(),
-          ),
-        ],
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 8),
+            ),
+
+            // Events List
+            _buildEventsList(),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEventsList() {
-    final events = _selectedDay != null ? _getEventsForDay(_selectedDay!) : [];
+    if (_selectedDay == null) {
+      return const SliverToBoxAdapter(
+        child: SizedBox(),
+      );
+    }
+
+    final events = _getEventsForDay(_selectedDay!);
 
     if (events.isEmpty) {
-      return Center(
+      return SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.all(40),
+          padding: const EdgeInsets.all(32),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.event_busy,
                 size: 64,
-                color: Colors.grey[300],
+                color: Colors.grey[400],
               ),
               const SizedBox(height: 16),
               Text(
                 'No events on this day',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Select another date to view events',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[500],
                 ),
               ),
             ],
@@ -285,93 +308,57 @@ class _CalendarPageState extends State<CalendarPage> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: events.length,
-      itemBuilder: (context, index) => _buildEventCard(events[index]),
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+            (context, index) {
+          final event = events[index];
+          return _buildEventCard(event);
+        },
+        childCount: events.length,
+      ),
     );
   }
 
   Widget _buildEventCard(Event event) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: event.category.isNotEmpty
-              ? CategoryHelper.getColor(event.category).withOpacity(0.3)
-              : Colors.grey.shade300,
-          width: 2,
-        ),
       ),
       child: InkWell(
         onTap: () => _showEventDetails(event),
         borderRadius: BorderRadius.circular(12),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              colors: [
-                Colors.white,
-                event.category.isNotEmpty
-                    ? CategoryHelper.getLightColor(event.category)
-                    : Colors.grey.shade50,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Time indicator
-                Container(
-                  width: 4,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: event.category.isNotEmpty
-                        ? CategoryHelper.getColor(event.category)
-                        : Colors.grey,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 16),
-
-                // Event info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title
-                      Text(
-                        event.title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Event info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      event.title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 4),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
 
-                      // Organization
-                      if (event.organizationName != null &&
-                          event.organizationName!.isNotEmpty)
-                        Text(
-                          event.organizationName!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-
-                      // Time and location
+                    // Time
+                    if (event.dateTime != null)
                       Row(
                         children: [
-                          Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                          Icon(
+                            Icons.access_time,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             event.formattedTime,
@@ -380,44 +367,53 @@ class _CalendarPageState extends State<CalendarPage> {
                               color: Colors.grey[700],
                             ),
                           ),
-                          if (event.location.isNotEmpty) ...[
-                            const SizedBox(width: 12),
-                            Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                event.location,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[700],
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                        ],
+                      ),
+
+                    // Location
+                    if (event.location.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              event.location,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[700],
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ],
+                  ],
+                ),
+              ),
+
+              // Category icon
+              if (event.category.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: CategoryHelper.getColor(event.category),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    CategoryHelper.getIcon(event.category),
+                    size: 24,
+                    color: Colors.white,
                   ),
                 ),
-
-                // Category icon
-                if (event.category.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: CategoryHelper.getColor(event.category),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      CategoryHelper.getIcon(event.category),
-                      size: 24,
-                      color: Colors.white,
-                    ),
-                  ),
-              ],
-            ),
+            ],
           ),
         ),
       ),

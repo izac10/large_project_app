@@ -144,7 +144,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
             label: '',
           ),
           const BottomNavigationBarItem(
-            icon: Icon(Icons.event),
+            icon: Icon(Icons.search),
             label: '',
           ),
           // Dynamic login/logout button

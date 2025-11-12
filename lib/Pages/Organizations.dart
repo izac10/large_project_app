@@ -37,19 +37,26 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
 
     try {
       final List<Map<String, dynamic>> clubsJson = await ApiService.fetchAllOrgs();
+      final clubs = clubsJson.map((json) => Club.fromJson(json)).toList();
+
+      // ✨ NEW: Sort by createdAt (newest first)
+      clubs.sort((a, b) {
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!); // Newest first
+      });
+
       setState(() {
-        _clubs = clubsJson.map((json) => Club.fromJson(json)).toList();
+        _clubs = clubs;
         _loading = false;
       });
     } catch (e) {
-      // If backend doesn't have /org/all endpoint yet, show helpful message
       setState(() {
         _error = 'Backend endpoint missing. Please update your backend org.js file.';
         _loading = false;
-        _clubs = []; // Show empty state instead of crash
+        _clubs = [];
       });
-
-      // Log the actual error for debugging
       print('Error loading organizations: $e');
     }
   }
@@ -426,18 +433,45 @@ class _OrganizationsPageState extends State<OrganizationsPage> {
               ),
             ),
 
-            // Title section
+            // Title and member count section
             Padding(
               padding: const EdgeInsets.all(12),
-              child: Text(
-                club.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Title
+                  Text(
+                    club.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                  // ✨ NEW: Member count
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.people,
+                        size: 14,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${club.memberCount} ${club.memberCount == 1 ? "member" : "members"}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],

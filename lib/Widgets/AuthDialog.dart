@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/session.dart';
+import '../Pages/EmailVerification.dart';
+import '../Pages/ForgotPassword.dart';
 
 class AuthDialog extends StatefulWidget {
   const AuthDialog({super.key});
@@ -52,23 +54,12 @@ class _AuthDialogState extends State<AuthDialog>
         password: _loginPass.text,
       );
 
-      // Debug: Print what we received
-      print('🔍 Login response: $json');
-      print('🔍 User data: ${json['user']}');
-
       final user = AppUser.fromJson(json['user']);
       Session.currentUser = user;
-
-      // Debug: Print parsed user
-      print('✅ Parsed user: ${user.toJson()}');
-      print('✅ User role: ${user.role}');
-      print('✅ User isAdmin: ${user.isAdmin}');
-      print('✅ Session.isAdmin: ${Session.isAdmin}');
 
       if (!mounted) return;
       Navigator.pop(context, true);
 
-      // Show success message with role info
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -77,10 +68,30 @@ class _AuthDialogState extends State<AuthDialog>
         ),
       );
     } catch (e) {
-      print('❌ Login error: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Login failed: $e')));
+
+      // Check if error is due to unverified email
+      if (e.toString().contains('verify your email') ||
+          e.toString().contains('requiresVerification')) {
+        // Navigate to email verification screen
+        final verified = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmailVerificationPage(
+              email: _loginEmail.text.trim(),
+            ),
+          ),
+        );
+
+        // If verified, try to login again
+        if (verified == true) {
+          _login();
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -91,8 +102,6 @@ class _AuthDialogState extends State<AuthDialog>
     try {
       final name = '${_first.text.trim()} ${_last.text.trim()}'.trim();
 
-      print('🔍 Registering with role: $_role');
-
       final json = await ApiService.register(
         name: name,
         email: _email.text.trim(),
@@ -100,38 +109,60 @@ class _AuthDialogState extends State<AuthDialog>
         role: _role,
       );
 
-      // Debug: Print what we received
-      print('🔍 Register response: $json');
-      print('🔍 User data: ${json['user']}');
-
-      final user = AppUser.fromJson(json['user']);
-      Session.currentUser = user;
-
-      // Debug: Print parsed user
-      print('✅ Parsed user: ${user.toJson()}');
-      print('✅ User role: ${user.role}');
-      print('✅ User isAdmin: ${user.isAdmin}');
-      print('✅ Session.isAdmin: ${Session.isAdmin}');
-
       if (!mounted) return;
-      Navigator.pop(context, true);
 
-      // Show success message with role info
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Registered as ${user.role} (Admin: ${user.isAdmin})',
+      // Navigate to email verification screen
+      final verified = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EmailVerificationPage(
+            email: _email.text.trim(),
+            userName: name,
           ),
         ),
       );
+
+      // If verified, update session and close dialog
+      if (verified == true) {
+        // Fetch user again to get updated verification status
+        try {
+          final loginJson = await ApiService.login(
+            email: _email.text.trim(),
+            password: _pass.text,
+          );
+          Session.currentUser = AppUser.fromJson(loginJson['user']);
+        } catch (e) {
+          // If login fails after verification, just use the registration response
+          Session.currentUser = AppUser.fromJson(json['user']);
+        }
+
+        if (!mounted) return;
+        Navigator.pop(context, true);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created and verified successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
-      print('❌ Register error: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Registration failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registration failed: $e')),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _forgotPassword() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ForgotPasswordPage(),
+      ),
+    );
   }
 
   // styles
@@ -242,7 +273,25 @@ class _AuthDialogState extends State<AuthDialog>
           style: const TextStyle(fontSize: 18),
           decoration: _decor('password'),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
+
+        // Forgot password link
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _forgotPassword,
+            child: const Text(
+              'Forgot Password?',
+              style: TextStyle(
+                color: Colors.blue,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+
         SizedBox(
           width: double.infinity,
           child: TextButton.icon(
