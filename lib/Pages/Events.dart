@@ -536,6 +536,19 @@ class _EventDetailPageState extends State<EventDetailPage> {
       if (ok != true || !mounted) return;
     }
 
+    // After login (or if already logged in), check if user is an officer
+    if (Session.isAdmin) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Officers cannot join events. You can create and manage your own events instead!'),
+          duration: Duration(seconds: 4),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {

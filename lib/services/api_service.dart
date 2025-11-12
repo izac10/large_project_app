@@ -45,60 +45,46 @@ class ApiService {
     throw Exception('Login failed ${resp.statusCode}: ${resp.body}');
   }
 
-  // ==================== EMAIL VERIFICATION ====================
-
-  /// Verify email with code
-  static Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
-    final resp = await http.post(_u('/auth/verify-email'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'code': code}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
-    }
-    throw Exception('Verification failed ${resp.statusCode}: ${resp.body}');
-  }
-
-  /// Resend verification code
-  static Future<void> resendVerificationCode(String email) async {
-    final resp = await http.post(_u('/auth/resend-verification'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}));
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Resend failed ${resp.statusCode}: ${resp.body}');
-    }
-  }
-
-  // ==================== PASSWORD RESET ====================
-
-  /// Request password reset (sends email with reset link)
-  static Future<void> requestPasswordReset(String email) async {
+  /// Send password reset code to email
+  static Future<void> sendPasswordResetCode(String email) async {
     final resp = await http.post(_u('/auth/forgot-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email}));
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Password reset request failed ${resp.statusCode}: ${resp.body}');
-    }
-  }
-
-  /// Verify reset token is valid
-  static Future<Map<String, dynamic>> verifyResetToken(String token) async {
-    final resp = await http.post(_u('/auth/verify-reset-token'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'token': token}));
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+      return;
     }
-    throw Exception('Token verification failed ${resp.statusCode}: ${resp.body}');
+    throw Exception('Send code failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Reset password with token
-  static Future<void> resetPassword(String token, String newPassword) async {
+  /// Verify the reset code
+  static Future<bool> verifyResetCode(String email, String code) async {
+    final resp = await http.post(_u('/auth/verify-reset-code'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'code': code}));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final data = jsonDecode(resp.body);
+      return data['valid'] == true;
+    }
+    return false;
+  }
+
+  /// Reset password with verified code
+  static Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
     final resp = await http.post(_u('/auth/reset-password'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'token': token, 'newPassword': newPassword}));
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Password reset failed ${resp.statusCode}: ${resp.body}');
+        body: jsonEncode({
+          'email': email,
+          'code': code,
+          'newPassword': newPassword,
+        }));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      return;
     }
+    throw Exception('Reset password failed ${resp.statusCode}: ${resp.body}');
   }
 
   // ==================== ORGANIZATIONS/CLUBS ====================
@@ -177,8 +163,6 @@ class ApiService {
   }
 
   // ==================== EVENTS ====================
-  // NOTE: These are placeholder methods. You'll need to implement the backend routes
-  // for events similar to how organizations are implemented.
 
   /// Fetch ALL events
   static Future<List<Map<String, dynamic>>> fetchAllEvents() async {
@@ -199,14 +183,14 @@ class ApiService {
     throw Exception('Fetch event failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Fetch events by admin/officer email
+  /// Fetch events created by an admin/officer (by email)
   static Future<List<Map<String, dynamic>>> fetchEventsByAdminEmail(String email) async {
     final resp = await http.get(_u('/event/by-admin', {'email': email}));
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final List<dynamic> list = jsonDecode(resp.body);
       return list.cast<Map<String, dynamic>>();
     }
-    throw Exception('Fetch events by admin failed ${resp.statusCode}: ${resp.body}');
+    throw Exception('Fetch events failed ${resp.statusCode}: ${resp.body}');
   }
 
   /// Create or update an event
@@ -248,5 +232,29 @@ class ApiService {
       return jsonDecode(resp.body) as Map<String, dynamic>;
     }
     throw Exception('Leave event failed ${resp.statusCode}: ${resp.body}');
+  }
+
+  // ==================== EMAIL VERIFICATION ====================
+
+  /// Verify email with code
+  static Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
+    final resp = await http.post(_u('/auth/verify-email'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'code': code}));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Email verification failed ${resp.statusCode}: ${resp.body}');
+  }
+
+  /// Resend verification code
+  static Future<void> resendVerificationCode(String email) async {
+    final resp = await http.post(_u('/auth/resend-verification'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}));
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      return;
+    }
+    throw Exception('Resend verification failed ${resp.statusCode}: ${resp.body}');
   }
 }
