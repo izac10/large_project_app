@@ -27,11 +27,11 @@ class Club {
   factory Club.fromJson(Map<String, dynamic> json) {
     return Club(
       id: json['_id']?.toString(),
-      title: json['title'] ?? json['name'] ?? '',
+      title: json['name'] ?? json['title'] ?? '', // Backend uses 'name' field
       category: json['category'] ?? '',
       description: json['description'] ?? '',
-      imageUrl: json['imageUrl'] ?? '',
-      createdBy: json['createdBy']?.toString(),
+      imageUrl: json['logo'] ?? json['imageUrl'] ?? '', // Backend uses 'logo' field
+      createdBy: json['createdBy']?.toString() ?? json['createdById']?.toString(),
       members: (json['members'] as List<dynamic>?)
           ?.map((e) => e.toString())
           .toList() ??

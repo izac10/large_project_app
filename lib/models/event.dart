@@ -33,20 +33,23 @@ class Event {
   factory Event.fromJson(Map<String, dynamic> json) {
     return Event(
       id: json['_id']?.toString(),
-      title: json['title'] ?? json['name'] ?? '',
+      title: json['name'] ?? json['title'] ?? '', // Backend uses 'name' field
       category: json['category'] ?? '',
       description: json['description'] ?? '',
       location: json['location'] ?? '',
-      imageUrl: json['imageUrl'] ?? '',
-      dateTime: json['dateTime'] != null
-          ? DateTime.tryParse(json['dateTime'])
+      imageUrl: json['logo'] ?? json['imageUrl'] ?? '', // Backend uses 'logo' field
+      dateTime: json['date'] != null || json['dateTime'] != null
+          ? DateTime.tryParse(json['date'] ?? json['dateTime'])
           : null,
-      createdBy: json['createdBy']?.toString(),
+      createdBy: json['createdBy']?.toString() ?? json['createdById']?.toString(),
       organizationId: json['organizationId']?.toString(),
-      organizationName: json['organizationName']?.toString(),
-      attendees: (json['attendees'] as List<dynamic>?)
+      organizationName: json['organization']?.toString() ?? json['organizationName']?.toString(),
+      attendees: (json['rsvps'] as List<dynamic>?) // Backend uses 'rsvps' not 'attendees'
           ?.map((e) => e.toString())
           .toList() ??
+          (json['attendees'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
           [],
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'])

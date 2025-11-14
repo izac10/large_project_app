@@ -49,13 +49,22 @@ class _AuthDialogState extends State<AuthDialog>
   Future<void> _login() async {
     setState(() => _busy = true);
     try {
+      print('🔐 Attempting login with: ${_loginEmail.text.trim()}');
+
       final json = await ApiService.login(
         email: _loginEmail.text.trim(),
         password: _loginPass.text,
       );
 
+      print('✅ Login response received: $json');
+
       final user = AppUser.fromJson(json['user']);
-      Session.currentUser = user;
+      final token = json['token'] as String;
+
+      print('👤 User parsed: ${user.email}, role: ${user.role}');
+
+      // Save user and token to session
+      Session.setUser(user, token);
 
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -68,11 +77,15 @@ class _AuthDialogState extends State<AuthDialog>
         ),
       );
     } catch (e) {
+      print('❌ Login error: $e');
+      print('❌ Error type: ${e.runtimeType}');
+
       if (!mounted) return;
 
       // Check if error is due to unverified email
       if (e.toString().contains('verify your email') ||
-          e.toString().contains('requiresVerification')) {
+          e.toString().contains('requiresVerification') ||
+          e.toString().contains('not verified')) {
         // Navigate to email verification screen
         final verified = await Navigator.push(
           context,
@@ -102,12 +115,16 @@ class _AuthDialogState extends State<AuthDialog>
     try {
       final name = '${_first.text.trim()} ${_last.text.trim()}'.trim();
 
+      print('📝 Attempting registration: $name, ${_email.text.trim()}, role: $_role');
+
       final json = await ApiService.register(
         name: name,
         email: _email.text.trim(),
         password: _pass.text,
         role: _role,
       );
+
+      print('✅ Registration response: $json');
 
       if (!mounted) return;
 
@@ -126,14 +143,20 @@ class _AuthDialogState extends State<AuthDialog>
       if (verified == true) {
         // Fetch user again to get updated verification status
         try {
+          print('🔄 Logging in after verification...');
           final loginJson = await ApiService.login(
             email: _email.text.trim(),
             password: _pass.text,
           );
-          Session.currentUser = AppUser.fromJson(loginJson['user']);
+          final user = AppUser.fromJson(loginJson['user']);
+          final token = loginJson['token'] as String;
+          Session.setUser(user, token);
         } catch (e) {
+          print('⚠️ Post-verification login failed, using registration data: $e');
           // If login fails after verification, just use the registration response
-          Session.currentUser = AppUser.fromJson(json['user']);
+          final user = AppUser.fromJson(json['user']);
+          final token = json['token'] as String;
+          Session.setUser(user, token);
         }
 
         if (!mounted) return;
@@ -147,6 +170,9 @@ class _AuthDialogState extends State<AuthDialog>
         );
       }
     } catch (e) {
+      print('❌ Registration error: $e');
+      print('❌ Error type: ${e.runtimeType}');
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Registration failed: $e')),

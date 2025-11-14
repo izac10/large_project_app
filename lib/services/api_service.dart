@@ -1,260 +1,553 @@
+// services/api_service.dart - UPDATED FOR DIGITALOCEAN BACKEND
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
+  // 🔥 DigitalOcean droplet URL
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:4000',
+    defaultValue: 'http://178.128.188.181:5000',
   );
 
   static Uri _u(String p, [Map<String, String>? q]) =>
       Uri.parse('$baseUrl$p').replace(queryParameters: q);
 
+  // Store JWT token
+  static String? _authToken;
+
+  static void setAuthToken(String token) {
+    _authToken = token;
+  }
+
+  static void clearAuthToken() {
+    _authToken = null;
+  }
+
+  // Helper to add auth headers
+  static Map<String, String> _headers({bool needsAuth = false}) {
+    final headers = {'Content-Type': 'application/json'};
+    if (needsAuth && _authToken != null) {
+      headers['Authorization'] = 'Bearer $_authToken';
+    }
+    return headers;
+  }
+
   // ==================== AUTH ====================
 
+  /// Register a new user
   static Future<Map<String, dynamic>> register({
     required String name,
     required String email,
     required String password,
     required String role,
   }) async {
-    final resp = await http.post(_u('/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'name': name,
-          'email': email,
-          'password': password,
-          'role': role,
-        }));
+    final resp = await http.post(
+      _u('/api/auth/signup'), // Backend uses /signup not /register
+      headers: _headers(),
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+      }),
+    );
+
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      if (data['token'] != null) {
+        setAuthToken(data['token']);
+      }
+      return data;
     }
-    throw Exception('Register failed ${resp.statusCode}: ${resp.body}');
+
+    // Parse error message from backend
+    try {
+      final errorData = jsonDecode(resp.body);
+      throw Exception(errorData['error'] ?? 'Register failed ${resp.statusCode}');
+    } catch (e) {
+      throw Exception('Register failed ${resp.statusCode}: ${resp.body}');
+    }
   }
 
+  /// Login
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
-    final resp = await http.post(_u('/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}));
+    final resp = await http.post(
+      _u('/api/auth/login'),
+      headers: _headers(),
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      if (data['token'] != null) {
+        setAuthToken(data['token']);
+      }
+      return data;
+    }
+
+    // Parse error message from backend
+    try {
+      final errorData = jsonDecode(resp.body);
+      throw Exception(errorData['error'] ?? 'Login failed ${resp.statusCode}');
+    } catch (e) {
+      throw Exception('Login failed ${resp.statusCode}: ${resp.body}');
+    }
+  }
+
+  /// Get current user info
+  static Future<Map<String, dynamic>> getCurrentUser() async {
+    final resp = await http.post(
+      _u('/api/auth/me'),
+      headers: _headers(needsAuth: true),
+    );
+
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       return jsonDecode(resp.body) as Map<String, dynamic>;
     }
-    throw Exception('Login failed ${resp.statusCode}: ${resp.body}');
+    throw Exception('Get user failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Send password reset code to email
-  static Future<void> sendPasswordResetCode(String email) async {
-    final resp = await http.post(_u('/auth/forgot-password'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}));
+  /// Verify email with code
+  static Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
+    final resp = await http.post(
+      _u('/api/auth/verify'),
+      headers: _headers(),
+      body: jsonEncode({'email': email, 'code': code}),
+    );
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      return data;
+    }
+
+    // Parse error message from backend
+    try {
+      final errorData = jsonDecode(resp.body);
+      throw Exception(errorData['error'] ?? 'Email verification failed');
+    } catch (e) {
+      throw Exception('Email verification failed ${resp.statusCode}: ${resp.body}');
+    }
+  }
+
+  /// Resend verification code
+  static Future<void> resendVerificationCode(String email) async {
+    final resp = await http.post(
+      _u('/api/auth/resend-verification'),
+      headers: _headers(),
+      body: jsonEncode({'email': email}),
+    );
+
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       return;
     }
-    throw Exception('Send code failed ${resp.statusCode}: ${resp.body}');
+    throw Exception('Resend verification failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Verify the reset code
+  /// Send password reset code
+  static Future<void> sendPasswordResetCode(String email) async {
+    // Note: Implement this in your backend if needed
+    throw UnimplementedError('Password reset not available in backend yet');
+  }
+
+  /// Verify reset code
   static Future<bool> verifyResetCode(String email, String code) async {
-    final resp = await http.post(_u('/auth/verify-reset-code'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'code': code}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      final data = jsonDecode(resp.body);
-      return data['valid'] == true;
-    }
-    return false;
+    throw UnimplementedError('Password reset not available in backend yet');
   }
 
-  /// Reset password with verified code
+  /// Reset password
   static Future<void> resetPassword({
     required String email,
     required String code,
     required String newPassword,
   }) async {
-    final resp = await http.post(_u('/auth/reset-password'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'code': code,
-          'newPassword': newPassword,
-        }));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return;
-    }
-    throw Exception('Reset password failed ${resp.statusCode}: ${resp.body}');
+    throw UnimplementedError('Password reset not available in backend yet');
   }
 
   // ==================== ORGANIZATIONS/CLUBS ====================
 
-  /// Fetch ALL clubs/organizations
+  /// Fetch ALL organizations
   static Future<List<Map<String, dynamic>>> fetchAllOrgs() async {
-    final resp = await http.get(_u('/org/all'));
+    final resp = await http.get(_u('/api/orgs'));
+
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      final List<dynamic> list = jsonDecode(resp.body);
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final List<dynamic> list = data['orgs'] ?? [];
       return list.cast<Map<String, dynamic>>();
     }
     throw Exception('Fetch all orgs failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Fetch a specific club by ID
+  /// Fetch organization by ID
   static Future<Map<String, dynamic>> fetchOrgById(String id) async {
-    final resp = await http.get(_u('/org/$id'));
+    // Backend uses names, so fetch all and find by ID
+    final allOrgs = await fetchAllOrgs();
+    final org = allOrgs.firstWhere(
+          (o) => o['_id'].toString() == id,
+      orElse: () => throw Exception('Organization not found'),
+    );
+    return org;
+  }
+
+  /// Fetch organization by name
+  static Future<Map<String, dynamic>> fetchOrgByName(String name) async {
+    final encodedName = Uri.encodeComponent(name);
+    final resp = await http.get(_u('/api/orgs/$encodedName'));
+
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      return data['organization'] ?? {};
     }
     throw Exception('Fetch org failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Fetch the club/organization that this admin/officer manages
+  /// Fetch organization by admin email (for officers)
   static Future<Map<String, dynamic>?> fetchOrgByAdminEmail(String email) async {
-    final resp = await http.get(_u('/org/by-admin', {'email': email}));
-    if (resp.statusCode == 404) return null;
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+    try {
+      // Get current user's organizations
+      final resp = await http.get(
+        _u('/api/orgs/my-org'),
+        headers: _headers(needsAuth: true),
+      );
+
+      if (resp.statusCode == 404) return null;
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return data['organization'];
+      }
+
+      return null;
+    } catch (e) {
+      print('Error fetching org by admin email: $e');
+      return null;
     }
-    throw Exception('Fetch org failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Create or update a club/organization
-  /// Payload should include: title (or name), category, description, imageUrl
-  /// For creation: adminEmail is required
-  /// For update: _id is required
+  /// Create or update an organization
   static Future<Map<String, dynamic>> upsertOrg(Map<String, dynamic> payload) async {
-    final resp = await http.post(_u('/org/upsert'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payload));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+    final hasId = payload.containsKey('_id');
+    final hasName = payload.containsKey('name') || payload.containsKey('title');
+
+    if (hasId || hasName) {
+      // UPDATE existing org
+      final name = Uri.encodeComponent(payload['name'] ?? payload['title']);
+      final resp = await http.patch(
+        _u('/api/orgs/$name'),
+        headers: _headers(needsAuth: true),
+        body: jsonEncode({
+          'description': payload['description'],
+          'category': payload['category'],
+          'logo': payload['imageUrl'],
+        }),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return data['organization'] ?? {};
+      }
+      throw Exception('Update org failed ${resp.statusCode}: ${resp.body}');
+    } else {
+      // CREATE new org
+      final resp = await http.post(
+        _u('/api/orgs'),
+        headers: _headers(needsAuth: true),
+        body: jsonEncode({
+          'name': payload['title'] ?? payload['name'],
+          'description': payload['description'],
+          'category': payload['category'],
+          'logo': payload['imageUrl'],
+        }),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return data['organization'] ?? {};
+      }
+      throw Exception('Create org failed ${resp.statusCode}: ${resp.body}');
     }
-    throw Exception('Save failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Delete a club/organization by ID
-  static Future<void> deleteOrg(String id) async {
-    final resp = await http.delete(_u('/org/$id'));
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Delete failed ${resp.statusCode}: ${resp.body}');
+  /// Delete organization
+  static Future<void> deleteOrg(String idOrName) async {
+    // Try to get org first to find its name
+    try {
+      final org = await fetchOrgById(idOrName);
+      final name = Uri.encodeComponent(org['name'] ?? idOrName);
+
+      final resp = await http.delete(
+        _u('/api/orgs/$name'),
+        headers: _headers(needsAuth: true),
+      );
+
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception('Delete failed ${resp.statusCode}: ${resp.body}');
+      }
+    } catch (e) {
+      // If not found by ID, try as name directly
+      final encodedName = Uri.encodeComponent(idOrName);
+      final resp = await http.delete(
+        _u('/api/orgs/$encodedName'),
+        headers: _headers(needsAuth: true),
+      );
+
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception('Delete failed ${resp.statusCode}: ${resp.body}');
+      }
     }
   }
 
-  /// Join a club (add user to members list)
-  static Future<Map<String, dynamic>> joinOrg(String clubId, String userId) async {
-    final resp = await http.post(_u('/org/$clubId/join'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+  /// Join an organization
+  static Future<Map<String, dynamic>> joinOrg(String orgIdOrName, String userId) async {
+    try {
+      // Try to get org name from ID
+      String orgName = orgIdOrName;
+      try {
+        final org = await fetchOrgById(orgIdOrName);
+        orgName = org['name'] ?? orgIdOrName;
+      } catch (e) {
+        // If fetch fails, assume it's already a name
+      }
+
+      final encodedName = Uri.encodeComponent(orgName);
+      final resp = await http.post(
+        _u('/api/orgs/$encodedName/join'),
+        headers: _headers(needsAuth: true),
+        body: jsonEncode({}),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return {'success': true, 'club': data['organization'] ?? {}};
+      }
+      throw Exception('Join failed ${resp.statusCode}: ${resp.body}');
+    } catch (e) {
+      throw Exception('Join failed: $e');
     }
-    throw Exception('Join failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Leave a club (remove user from members list)
-  static Future<Map<String, dynamic>> leaveOrg(String clubId, String userId) async {
-    final resp = await http.post(_u('/org/$clubId/leave'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+  /// Leave an organization
+  static Future<Map<String, dynamic>> leaveOrg(String orgIdOrName, String userId) async {
+    try {
+      // Try to get org name from ID
+      String orgName = orgIdOrName;
+      try {
+        final org = await fetchOrgById(orgIdOrName);
+        orgName = org['name'] ?? orgIdOrName;
+      } catch (e) {
+        // If fetch fails, assume it's already a name
+      }
+
+      final encodedName = Uri.encodeComponent(orgName);
+      final resp = await http.post(
+        _u('/api/orgs/$encodedName/leave'),
+        headers: _headers(needsAuth: true),
+        body: jsonEncode({}),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return {'success': true, 'club': data['organization'] ?? {}};
+      }
+      throw Exception('Leave failed ${resp.statusCode}: ${resp.body}');
+    } catch (e) {
+      throw Exception('Leave failed: $e');
     }
-    throw Exception('Leave failed ${resp.statusCode}: ${resp.body}');
   }
 
   // ==================== EVENTS ====================
 
   /// Fetch ALL events
   static Future<List<Map<String, dynamic>>> fetchAllEvents() async {
-    final resp = await http.get(_u('/event/all'));
+    final resp = await http.get(_u('/api/events'));
+
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      final List<dynamic> list = jsonDecode(resp.body);
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final List<dynamic> list = data['events'] ?? [];
       return list.cast<Map<String, dynamic>>();
     }
     throw Exception('Fetch all events failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Fetch a specific event by ID
+  /// Fetch event by ID
   static Future<Map<String, dynamic>> fetchEventById(String id) async {
-    final resp = await http.get(_u('/event/$id'));
+    // Backend uses names, so fetch all and find by ID
+    final allEvents = await fetchAllEvents();
+    final event = allEvents.firstWhere(
+          (e) => e['_id'].toString() == id,
+      orElse: () => throw Exception('Event not found'),
+    );
+    return event;
+  }
+
+  /// Fetch event by name
+  static Future<Map<String, dynamic>> fetchEventByName(String name) async {
+    final encodedName = Uri.encodeComponent(name);
+    final resp = await http.get(_u('/api/events/$encodedName'));
+
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      return data['event'] ?? {};
     }
     throw Exception('Fetch event failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Fetch events created by an admin/officer (by email)
+  /// Fetch events by admin email
   static Future<List<Map<String, dynamic>>> fetchEventsByAdminEmail(String email) async {
-    final resp = await http.get(_u('/event/by-admin', {'email': email}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      final List<dynamic> list = jsonDecode(resp.body);
-      return list.cast<Map<String, dynamic>>();
+    try {
+      final resp = await http.get(
+        _u('/api/events/my-events'),
+        headers: _headers(needsAuth: true),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final List<dynamic> list = data['events'] ?? [];
+        return list.cast<Map<String, dynamic>>();
+      }
+
+      return [];
+    } catch (e) {
+      print('Error fetching events by admin email: $e');
+      return [];
     }
-    throw Exception('Fetch events failed ${resp.statusCode}: ${resp.body}');
   }
 
   /// Create or update an event
   static Future<Map<String, dynamic>> upsertEvent(Map<String, dynamic> payload) async {
-    final resp = await http.post(_u('/event/upsert'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(payload));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+    final hasId = payload.containsKey('_id');
+    final hasName = payload.containsKey('name') || payload.containsKey('title');
+
+    if (hasId || hasName) {
+      // UPDATE
+      final name = Uri.encodeComponent(payload['name'] ?? payload['title']);
+      final resp = await http.patch(
+        _u('/api/events/$name'),
+        headers: _headers(needsAuth: true),
+        body: jsonEncode({
+          'description': payload['description'],
+          'date': payload['dateTime'],
+          'location': payload['location'],
+          'category': payload['category'],
+          'logo': payload['imageUrl'],
+        }),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return data['event'] ?? {};
+      }
+      throw Exception('Update event failed ${resp.statusCode}: ${resp.body}');
+    } else {
+      // CREATE
+      final resp = await http.post(
+        _u('/api/events'),
+        headers: _headers(needsAuth: true),
+        body: jsonEncode({
+          'name': payload['title'] ?? payload['name'],
+          'description': payload['description'],
+          'date': payload['dateTime'],
+          'location': payload['location'],
+          'category': payload['category'],
+          'organization': payload['organizationName'],
+          'logo': payload['imageUrl'],
+        }),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return data['event'] ?? {};
+      }
+      throw Exception('Create event failed ${resp.statusCode}: ${resp.body}');
     }
-    throw Exception('Save event failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Delete an event by ID
-  static Future<void> deleteEvent(String id) async {
-    final resp = await http.delete(_u('/event/$id'));
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Delete event failed ${resp.statusCode}: ${resp.body}');
+  /// Delete event
+  static Future<void> deleteEvent(String idOrName) async {
+    try {
+      // Try to get event first to find its name
+      final event = await fetchEventById(idOrName);
+      final name = Uri.encodeComponent(event['name'] ?? idOrName);
+
+      final resp = await http.delete(
+        _u('/api/events/$name'),
+        headers: _headers(needsAuth: true),
+      );
+
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception('Delete failed ${resp.statusCode}: ${resp.body}');
+      }
+    } catch (e) {
+      // If not found by ID, try as name directly
+      final encodedName = Uri.encodeComponent(idOrName);
+      final resp = await http.delete(
+        _u('/api/events/$encodedName'),
+        headers: _headers(needsAuth: true),
+      );
+
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        throw Exception('Delete failed ${resp.statusCode}: ${resp.body}');
+      }
     }
   }
 
-  /// Join an event (add user to attendees list)
-  static Future<Map<String, dynamic>> joinEvent(String eventId, String userId) async {
-    final resp = await http.post(_u('/event/$eventId/join'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+  /// Join an event (RSVP)
+  static Future<Map<String, dynamic>> joinEvent(String eventIdOrName, String userId) async {
+    try {
+      // Try to get event name from ID
+      String eventName = eventIdOrName;
+      try {
+        final event = await fetchEventById(eventIdOrName);
+        eventName = event['name'] ?? eventIdOrName;
+      } catch (e) {
+        // If fetch fails, assume it's already a name
+      }
+
+      final encodedName = Uri.encodeComponent(eventName);
+      final resp = await http.post(
+        _u('/api/events/$encodedName/rsvp'),
+        headers: _headers(needsAuth: true),
+        body: jsonEncode({}),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return {'success': true, 'event': data['event'] ?? {}};
+      }
+      throw Exception('Join event failed ${resp.statusCode}: ${resp.body}');
+    } catch (e) {
+      throw Exception('Join event failed: $e');
     }
-    throw Exception('Join event failed ${resp.statusCode}: ${resp.body}');
   }
 
-  /// Leave an event (remove user from attendees list)
-  static Future<Map<String, dynamic>> leaveEvent(String eventId, String userId) async {
-    final resp = await http.post(_u('/event/$eventId/leave'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
-    }
-    throw Exception('Leave event failed ${resp.statusCode}: ${resp.body}');
-  }
+  /// Leave an event (Cancel RSVP)
+  static Future<Map<String, dynamic>> leaveEvent(String eventIdOrName, String userId) async {
+    try {
+      // Try to get event name from ID
+      String eventName = eventIdOrName;
+      try {
+        final event = await fetchEventById(eventIdOrName);
+        eventName = event['name'] ?? eventIdOrName;
+      } catch (e) {
+        // If fetch fails, assume it's already a name
+      }
 
-  // ==================== EMAIL VERIFICATION ====================
+      final encodedName = Uri.encodeComponent(eventName);
+      final resp = await http.post(
+        _u('/api/events/$encodedName/cancel-rsvp'),
+        headers: _headers(needsAuth: true),
+        body: jsonEncode({}),
+      );
 
-  /// Verify email with code
-  static Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
-    final resp = await http.post(_u('/auth/verify-email'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'code': code}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return {'success': true, 'event': data['event'] ?? {}};
+      }
+      throw Exception('Leave event failed ${resp.statusCode}: ${resp.body}');
+    } catch (e) {
+      throw Exception('Leave event failed: $e');
     }
-    throw Exception('Email verification failed ${resp.statusCode}: ${resp.body}');
-  }
-
-  /// Resend verification code
-  static Future<void> resendVerificationCode(String email) async {
-    final resp = await http.post(_u('/auth/resend-verification'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}));
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-      return;
-    }
-    throw Exception('Resend verification failed ${resp.statusCode}: ${resp.body}');
   }
 }

@@ -21,8 +21,11 @@ class AppUser {
     // Get isAdmin from JSON, or derive it from role
     final isAdmin = j['isAdmin'] == true || role == 'officer' || role == 'admin';
 
+    // Backend sends 'id' not '_id'
+    final userId = j['id']?.toString() ?? j['_id']?.toString() ?? '';
+
     return AppUser(
-      id: j['_id']?.toString() ?? j['id']?.toString() ?? '',
+      id: userId,
       name: j['name'] ?? '',
       email: j['email'] ?? '',
       role: role,
